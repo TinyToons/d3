@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Percolation Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .blocked { fill: #666; }
+        .open { fill: #fff; }
+        .full { fill: #00f; }
+        .grid { stroke: #ccc; stroke-width: 0.5; }
+    </style>
+</head>
+<body>
+    <div id="visualization"></div>
+    <button onclick="step()">Step</button>
+    <button onclick="run()">Run</button> <!-- New Run button -->
+    <p>Percolates: <span id="status">false</span></p>
+    <script>
+        class WeightedQuickUnionUF {
+            constructor(size) {
+                this.id = Array(size).fill().map((_, i) => i);
+                this.sz = Array(size).fill(1);
+            }
+
+            find(p) {
+                while (p !== this.id[p]) {
+                    this.id[p] = this.id[this.id[p]];
+                    p = this.id[p];
+                }
+                return p;
+            }
+
+            union(p, q) {
+                const rootP = this.find(p);
+                const rootQ = this.find(q);
+                if (rootP === rootQ) return;
+                if (this.sz[rootP] < this.sz[rootQ]) {
+                    this.id[rootP] = rootQ;
+                    this.sz[rootQ] += this.sz[rootP];
+                } else {
+                    this.id[rootQ] = rootP;
+                    this.sz[rootP] += this.sz[rootQ];
+                }
+            }
+
+            connected(p, q) {
+                return this.find(p) === this.find(q);
+            }
+        }
+
+        class Percolation {
+            constructor(n) {
+                this.gridSize = n;
+                this.openSites = 0;
+                this.op = Array(n * n).fill(false);
+                this.uf = new WeightedQuickUnionUF(n * n + 2);
+                this.vts = n * n;
+                this.vbs = n * n + 1;
+            }
+
+            getIndex(row, col) {
+                return (row - 1) * this.gridSize + (col - 1);
+            }
+
+            open(row, col) {
+                const i = this.getIndex(row, col);
+                if (!this.op[i]) {
+                    this.op[i] = true;
+                    this.openSites++;
+                    if (col > 1 && this.isOpen(row, col - 1)) this.uf.union(i, i - 1);
+                    if (col < this.gridSize && this.isOpen(row, col + 1)) this.uf.union(i, i + 1);
+                    if (row === 1) this.uf.union(i, this.vts);
+                    if (row > 1 && this.isOpen(row - 1, col)) this.uf.union(i, i - this.gridSize);
+                    if (row === this.gridSize) this.uf.union(i, this.vbs);
+                    if (row < this.gridSize && this.isOpen(row + 1, col)) this.uf.union(i, i + this.gridSize);
+                }
+            }
+
+            isOpen(row, col) {
+                return this.op[this.getIndex(row, col)];
+            }
+
+            isFull(row, col) {
+                const i = this.getIndex(row, col);
+                return this.isOpen(row, col) && this.uf.connected(i, this.vts);
+            }
+
+            percolates() {
+                return this.uf.connected(this.vts, this.vbs);
+            }
+
+            randomOpen() {
+                let row, col;
+                do {
+                    row = Math.floor(Math.random() * this.gridSize) + 1;
+                    col = Math.floor(Math.random() * this.gridSize) + 1;
+                } while (this.isOpen(row, col));
+                this.open(row, col);
+            }
+        }
+
+        const n = 3;
+        const cellSize = 30;
+        const width = n * cellSize;
+        const height = n * cellSize;
+
+        let percolation = new Percolation(n);
+
+        const svg = d3.select("#visualization")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        const data = [];
+        for (let row = 1; row <= n; row++) {
+            for (let col = 1; col <= n; col++) {
+                data.push({ row, col });
+            }
+        }
+
+        const cells = svg.selectAll("rect")
+            .data(data)
+            .enter()
+            .append("rect")
+            .attr("x", d => (d.col - 1) * cellSize)
+            .attr("y", d => (d.row - 1) * cellSize)
+            .attr("width", cellSize)
+            .attr("height", cellSize)
+            .attr("class", "grid blocked");
+
+        function update() {
+            cells.attr("class", d => {
+                if (percolation.isFull(d.row, d.col)) return "grid full";
+                if (percolation.isOpen(d.row, d.col)) return "grid open";
+                return "grid blocked";
+            });
+            d3.select("#status").text(percolation.percolates());
+        }
+
+        function step() {
+            percolation.randomOpen();
+            update();
+        }
+
+        // New Run function
+        function run() {
+            percolation = new Percolation(n); // Reset with new instance
+            update(); // Reset display to all blocked
+            function loop() {
+                if (!percolation.percolates()) {
+                    percolation.randomOpen();
+                    update();
+                    setTimeout(loop, 100); // 100ms delay for visibility
+                }
+            }
+            loop();
+        }
+
+        update();
+    </script>
+</body>
+</html>
