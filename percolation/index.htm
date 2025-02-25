@@ -14,7 +14,7 @@
     <div id="visualization"></div>
     <button onclick="step()">Step</button>
     <button onclick="run()">Run</button> <!-- New Run button -->
-    <p>Percolates: <span id="status">false</span></p>
+    <p><span id="status">false</span></p>
     <script>
         class WeightedQuickUnionUF {
             constructor(size) {
@@ -54,6 +54,7 @@
                 this.openSites = 0;
                 this.op = Array(n * n).fill(false);
                 this.uf = new WeightedQuickUnionUF(n * n + 2);
+                this.ufFull = new WeightedQuickUnionUF(n * n + 1);
                 this.vts = n * n;
                 this.vbs = n * n + 1;
             }
@@ -67,12 +68,40 @@
                 if (!this.op[i]) {
                     this.op[i] = true;
                     this.openSites++;
-                    if (col > 1 && this.isOpen(row, col - 1)) this.uf.union(i, i - 1);
-                    if (col < this.gridSize && this.isOpen(row, col + 1)) this.uf.union(i, i + 1);
-                    if (row === 1) this.uf.union(i, this.vts);
-                    if (row > 1 && this.isOpen(row - 1, col)) this.uf.union(i, i - this.gridSize);
+                    // union with adjacent open sites
+                    // Left
+                    if (col > 1 && this.isOpen(row, col - 1)) {
+
+                        this.uf.union(i, i - 1);
+                        this.ufFull.union(i, i - 1);
+                    }
+                    // Right
+                    if (col < this.gridSize && this.isOpen(row, col + 1)) 
+                    {
+
+                        this.uf.union(i, i + 1);
+                        this.ufFull.union(i, i + 1);
+                    }
+                    // Up
+                    // If the site we opened is on the first row, union with the virtual top site
+                    if (row === 1) {
+                        this.uf.union(i, this.vts);
+                        this.ufFull.union(i, this.vts);
+                    }
+                    if (row > 1 && this.isOpen(row - 1, col)) 
+                    {
+                        this.uf.union(i, i - this.gridSize);
+                        this.ufFull.union(i, i - this.gridSize);
+                    }
+                    // Down
+                    // If the site we opened is on the last row, union with the virtual bottom site
+                    // ufFull is not updated since it doesn't manage the vbs
                     if (row === this.gridSize) this.uf.union(i, this.vbs);
-                    if (row < this.gridSize && this.isOpen(row + 1, col)) this.uf.union(i, i + this.gridSize);
+                    if (row < this.gridSize && this.isOpen(row + 1, col)) 
+                    {
+                        this.uf.union(i, i + this.gridSize);
+                        this.ufFull.union(i, i + this.gridSize);
+                    }
                 }
             }
 
@@ -82,7 +111,7 @@
 
             isFull(row, col) {
                 const i = this.getIndex(row, col);
-                return this.isOpen(row, col) && this.uf.connected(i, this.vts);
+                return this.isOpen(row, col) && this.ufFull.connected(i, this.vts);
             }
 
             percolates() {
@@ -99,7 +128,7 @@
             }
         }
 
-        const n = 3;
+        const n = 20;
         const cellSize = 30;
         const width = n * cellSize;
         const height = n * cellSize;
@@ -134,7 +163,7 @@
                 if (percolation.isOpen(d.row, d.col)) return "grid open";
                 return "grid blocked";
             });
-            d3.select("#status").text(percolation.percolates());
+            d3.select("#status").text(percolation.percolates()?percolation.openSites + " open sites":"");
         }
 
         function step() {
